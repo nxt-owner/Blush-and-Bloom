@@ -2,7 +2,6 @@ import { db } from './firebase-config.js';
 import { collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 
 const productsGrid = document.getElementById('products-grid');
-const filterBtns = document.querySelectorAll('.filter-chip');
 let allProducts = [];
 
 const WHATSAPP_NUMBER = "94784157316";
@@ -104,22 +103,69 @@ function renderProducts(products) {
     }).join('');
 }
 
-// ========== FILTERS ==========
-filterBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        filterBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const category = btn.getAttribute('data-filter');
-        if (category === 'all') {
-            renderProducts(allProducts);
+// ========== CATEGORIES & FILTERS ==========
+async function fetchCategories() {
+    const filtersContainer = document.getElementById('category-filters');
+    const defaultHtml = `
+        <button class="filter-chip active" data-filter="all"><i class="fas fa-stars"></i> All Items</button>
+        <button class="filter-chip" data-filter="bouquets"><i class="fas fa-seedling"></i> Bouquets</button>
+        <button class="filter-chip" data-filter="plushies"><i class="fas fa-paw"></i> Plushies</button>
+        <button class="filter-chip" data-filter="hampers"><i class="fas fa-box-heart"></i> Hampers</button>
+    `;
+
+    try {
+        const q = query(collection(db, "categories"), orderBy("name"));
+        const querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+            filtersContainer.innerHTML = defaultHtml;
         } else {
-            renderProducts(allProducts.filter(p => (p.category || '').toLowerCase() === category));
+            let filterHtml = `<button class="filter-chip active" data-filter="all"><i class="fas fa-stars"></i> All Items</button>`;
+            
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                const catName = data.name;
+                const displayCat = catName.charAt(0).toUpperCase() + catName.slice(1);
+                
+                let icon = 'fa-tag';
+                if (catName === 'bouquets') icon = 'fa-seedling';
+                else if (catName === 'plushies') icon = 'fa-paw';
+                else if (catName === 'hampers') icon = 'fa-box-heart';
+                else if (catName === 'other') icon = 'fa-gift';
+
+                filterHtml += `<button class="filter-chip" data-filter="${catName}">
+                        <i class="fas ${icon}"></i> ${displayCat}
+                    </button>`;
+            });
+            filtersContainer.innerHTML = filterHtml;
         }
+        setupFilterListeners();
+    } catch (error) {
+        console.error("Error fetching categories: ", error);
+        filtersContainer.innerHTML = defaultHtml;
+        setupFilterListeners();
+    }
+}
+
+function setupFilterListeners() {
+    const filterBtns = document.querySelectorAll('.filter-chip');
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            filterBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const category = btn.getAttribute('data-filter');
+            if (category === 'all') {
+                renderProducts(allProducts);
+            } else {
+                renderProducts(allProducts.filter(p => (p.category || '').toLowerCase() === category));
+            }
+        });
     });
-});
+}
 
 // ========== INIT ==========
 createParticles();
 initNavbar();
 fetchProducts();
+fetchCategories();
 setTimeout(initScrollAnimations, 500);
