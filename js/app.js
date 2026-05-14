@@ -1,0 +1,125 @@
+import { db } from './firebase-config.js';
+import { collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+
+const productsGrid = document.getElementById('products-grid');
+const filterBtns = document.querySelectorAll('.filter-chip');
+let allProducts = [];
+
+const WHATSAPP_NUMBER = "94784157316";
+
+// ========== PARTICLES ==========
+function createParticles() {
+    const container = document.getElementById('particles');
+    const emojis = ['🌸', '💖', '✨', '🌷', '💐', '🎀', '🦋', '⭐'];
+    for (let i = 0; i < 20; i++) {
+        const el = document.createElement('span');
+        el.className = 'particle';
+        el.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+        el.style.left = Math.random() * 100 + '%';
+        el.style.fontSize = (Math.random() * 16 + 10) + 'px';
+        el.style.animationDuration = (Math.random() * 15 + 10) + 's';
+        el.style.animationDelay = (Math.random() * 10) + 's';
+        container.appendChild(el);
+    }
+}
+
+// ========== NAVBAR SCROLL ==========
+function initNavbar() {
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+        navbar.classList.toggle('scrolled', window.scrollY > 50);
+    });
+    // Mobile menu
+    const btn = document.getElementById('mobile-menu-btn');
+    const menu = document.getElementById('mobile-menu');
+    btn.addEventListener('click', () => menu.classList.toggle('open'));
+    menu.querySelectorAll('.mobile-link').forEach(link => {
+        link.addEventListener('click', () => menu.classList.remove('open'));
+    });
+}
+
+// ========== SCROLL ANIMATIONS ==========
+function initScrollAnimations() {
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) entry.target.classList.add('visible');
+        });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.feature-card, .section-header').forEach(el => {
+        el.classList.add('fade-in');
+        observer.observe(el);
+    });
+}
+
+// ========== PRODUCTS ==========
+async function fetchProducts() {
+    try {
+        const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        allProducts = [];
+        querySnapshot.forEach((doc) => {
+            allProducts.push({ id: doc.id, ...doc.data() });
+        });
+        renderProducts(allProducts);
+    } catch (error) {
+        console.error("Error fetching products: ", error);
+        productsGrid.innerHTML = `<div class="empty-state">
+            <div class="empty-icon">😿</div>
+            <p class="empty-text">Oops! Could not load products. Please try again later.</p>
+        </div>`;
+    }
+}
+
+function renderProducts(products) {
+    if (products.length === 0) {
+        productsGrid.innerHTML = `<div class="empty-state">
+            <div class="empty-icon">🌸</div>
+            <p class="empty-text">No products found in this category yet.</p>
+        </div>`;
+        return;
+    }
+    productsGrid.innerHTML = products.map(product => {
+        const waText = encodeURIComponent(`Hi, I'm interested in ${product.name} for ${product.price} 🌸`);
+        const waLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${waText}`;
+        const categoryLabel = (product.category || 'gift').charAt(0).toUpperCase() + (product.category || 'gift').slice(1);
+        return `
+            <div class="product-card">
+                <div class="product-img-wrapper">
+                    <span class="product-category">${categoryLabel}</span>
+                    <img src="${product.imageUrl}" alt="${product.name}" class="product-img" loading="lazy"
+                         onerror="this.style.display='none'">
+                </div>
+                <div class="product-info">
+                    <h4 class="product-title">${product.name}</h4>
+                    <p class="product-desc">${product.description || ''}</p>
+                    <div class="product-footer">
+                        <span class="product-price">${product.price}</span>
+                    </div>
+                    <a href="${waLink}" target="_blank" rel="noopener noreferrer" class="wa-btn">
+                        <i class="fab fa-whatsapp"></i> Buy on WhatsApp
+                    </a>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// ========== FILTERS ==========
+filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        filterBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const category = btn.getAttribute('data-filter');
+        if (category === 'all') {
+            renderProducts(allProducts);
+        } else {
+            renderProducts(allProducts.filter(p => (p.category || '').toLowerCase() === category));
+        }
+    });
+});
+
+// ========== INIT ==========
+createParticles();
+initNavbar();
+fetchProducts();
+setTimeout(initScrollAnimations, 500);
